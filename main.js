@@ -2,9 +2,9 @@ const { app, BrowserWindow, ipcMain } = require("electron");
 const { exec } = require("child_process");
 const path = require("path");
 const fs = require("fs");
-const { desktopCapturer } = require("electron");
 let screenshotInterval = null;
-var robot = require("robotjs");
+// var robot = require("robotjs");
+const os = require("os");
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -28,7 +28,7 @@ async function captureScreenshot(taskId) {
     // robot.keyTap("printscreen");
     // robot.keyToggle("alt", "up");
 
-    /* Gnome  */
+    /* scrot method  */
 
     const screenshotDir = path.join(__dirname, "screenshots");
     if (!fs.existsSync(screenshotDir)) {
@@ -38,8 +38,24 @@ async function captureScreenshot(taskId) {
     const filename = `task-${taskId}-${Date.now()}.png`;
     const filepath = path.join(screenshotDir, filename);
 
-    // Use gnome-screenshot or scrot (depending on what is installed)
-    exec(`gnome-screenshot -f "${filepath}"`, (err) => {
+    let cmd;
+
+    const platform = os.platform();
+    if (platform === "win32") {
+      // Windows: requires nircmd in PATH
+      cmd = `nircmd.exe savescreenshot "${filepath}"`;
+    } else if (platform === "darwin") {
+      // macOS
+      cmd = `screencapture "${filepath}"`;
+    } else if (platform === "linux") {
+      // Linux: requires scrot
+      cmd = `scrot "${filepath}"`;
+    } else {
+      console.error("Unsupported platform:", platform);
+      return;
+    }
+
+    exec(cmd, (err) => {
       if (err) {
         console.error("Screenshot failed:", err);
       } else {
@@ -56,7 +72,7 @@ ipcMain.on("start-screenshots", (event, taskId) => {
   clearInterval(screenshotInterval); // clear if already running
   screenshotInterval = setInterval(() => {
     captureScreenshot(taskId);
-  }, 5000); // every 30 seconds
+  }, 5000); // every 5 seconds
 });
 
 // Take one screenshot on-demand
@@ -68,4 +84,32 @@ ipcMain.on("take-fullscreen-screenshot", (event, taskId) => {
 ipcMain.on("stop-screenshots", () => {
   clearInterval(screenshotInterval);
   screenshotInterval = null;
+});
+
+ipcMain.on("open-image-viewer", (event, imagePath) => {
+  const win = new BrowserWindow({
+    width: 800,
+    height: 600,
+    title: "Screenshot Viewer",
+    webPreferences: {
+      contextIsolation: true,
+    },
+  });
+
+
+  win.loadFile(
+    imagePath
+  );
+});
+
+
+ipcMain.handle("get-screenshots", () => {
+  const screenshotDir = path.join(__dirname, "screenshots");
+  const files = fs.readdirSync(screenshotDir);
+  const screenshots = files.map((file) => {
+    return path.join(screenshotDir, file);
+  });
+
+  console.log("Screenshots:", screenshots);
+  return screenshots;
 });

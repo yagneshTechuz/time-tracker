@@ -25,6 +25,27 @@ function renderTasks() {
   });
 }
 
+function renderScreenshots(screenshots) {
+  const list = document.getElementById("shotsList");
+  list.innerHTML = "";
+  screenshots.forEach((shot) => {
+    const li = document.createElement("li");
+    li.innerHTML = `
+      <img 
+        src="${shot}" 
+        alt="Screenshot" 
+        style="width: 100px; height: auto; cursor: pointer;" 
+        onclick="window.electronAPI.openImageViewer('${shot}')"
+      >
+    `;
+    list.appendChild(li);
+  });
+}
+
+window.electronAPI.getScreenshots().then((files) => {
+  renderScreenshots(files);
+});
+
 function formatTime(seconds) {
   const mins = Math.floor(seconds / 60);
   const secs = seconds % 60;
@@ -42,6 +63,9 @@ function startTimer(taskId) {
     if (task) {
       task.time += 1;
       renderTasks();
+      window.electronAPI.getScreenshots().then((files) => {
+        renderScreenshots(files);
+      });
     }
   }, 1000);
 
